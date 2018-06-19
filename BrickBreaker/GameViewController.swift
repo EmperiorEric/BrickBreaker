@@ -12,11 +12,19 @@ import SceneKit
 
 class GameViewController: UIViewController {
 
+    override func loadView() {
+        self.view = SCNView()
+    }
+
+    var scnView: SCNView {
+        return self.view as! SCNView
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         
         // create a new scene
-        let scene = SCNScene(named: "art.scnassets/ship.scn")!
+        let scene = SCNScene()
         
         // create and add a camera to the scene
         let cameraNode = SCNNode()
@@ -24,7 +32,8 @@ class GameViewController: UIViewController {
         scene.rootNode.addChildNode(cameraNode)
         
         // place the camera
-        cameraNode.position = SCNVector3(x: 0, y: 0, z: 15)
+        cameraNode.position = SCNVector3(x: 0, y: 25, z: 0)
+        cameraNode.eulerAngles.x = .pi / -2.0
         
         // create and add a light to the scene
         let lightNode = SCNNode()
@@ -39,13 +48,7 @@ class GameViewController: UIViewController {
         ambientLightNode.light!.type = .ambient
         ambientLightNode.light!.color = UIColor.darkGray
         scene.rootNode.addChildNode(ambientLightNode)
-        
-        // retrieve the ship node
-        let ship = scene.rootNode.childNode(withName: "ship", recursively: true)!
-        
-        // animate the 3d object
-        ship.runAction(SCNAction.repeatForever(SCNAction.rotateBy(x: 0, y: 2, z: 0, duration: 1)))
-        
+
         // retrieve the SCNView
         let scnView = self.view as! SCNView
         
@@ -60,14 +63,43 @@ class GameViewController: UIViewController {
         
         // configure the view
         scnView.backgroundColor = UIColor.black
+
+        let material = SCNMaterial()
+        material.diffuse.contents = UIColor(hue: .random(in: 0...255), saturation: 1, brightness: 1, alpha: 1)
+
+        let plane = SCNPlane(width: 100, height: 100)
+        plane.materials = [material]
+
+        let floor = SCNNode(geometry: plane)
+//        floor.physicsBody = SCNPhysicsBody.kinematic()
+        scene.rootNode.addChildNode(floor)
         
         // add a tap gesture recognizer
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
         scnView.addGestureRecognizer(tapGesture)
+
+        layoutDemoBlocks()
+    }
+
+    func layoutDemoBlocks() {
+        for x in 0..<8 {
+            for z in 0..<4 {
+                let material = SCNMaterial()
+                material.diffuse.contents = UIColor(hue: .random(in: 0...255), saturation: 1, brightness: 1, alpha: 1)
+
+                let box = SCNBox(width: 1, height: 0.5, length: 0.5, chamferRadius: 0)
+                box.materials = [material]
+
+                let node = SCNNode(geometry: box)
+                node.position = SCNVector3(x * 2 - 7, 1, z - 10)
+                node.physicsBody = SCNPhysicsBody.dynamic()
+
+                scnView.scene?.rootNode.addChildNode(node)
+            }
+        }
     }
     
-    @objc
-    func handleTap(_ gestureRecognize: UIGestureRecognizer) {
+    @objc func handleTap(_ gestureRecognize: UIGestureRecognizer) {
         // retrieve the SCNView
         let scnView = self.view as! SCNView
         
