@@ -53,6 +53,8 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         return floor
     }()
 
+    var displayLink: CADisplayLink?
+
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -90,7 +92,7 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         
         // allows the user to manipulate the camera
         scnView.allowsCameraControl = true
-        
+
         // show statistics such as fps and timing information
         scnView.showsStatistics = true
         
@@ -106,13 +108,16 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
 
         layoutDemoBlocks()
 
-        let displayLink = CADisplayLink(target: self, selector: #selector(gameloop))
-        displayLink.add(to: RunLoop.main, forMode: .tracking)
+        displayLink = CADisplayLink(target: self, selector: #selector(gameloop))
+        displayLink?.add(to: RunLoop.current, forMode: .tracking)
     }
 
     @objc func gameloop() {
+        print("Duh")
         addBall(at: view.center)
     }
+
+    var score: Int = 0
 
     func layoutDemoBlocks() {
         for x in 0..<8 {
@@ -124,11 +129,32 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
                 box.materials = [material]
 
                 let node = SCNNode(geometry: box)
-                node.position = SCNVector3(x * 2 - 7 + (z % 2), 0, z - 10)
+                node.position = SCNVector3(x * 2 - 7 + (z % 2), 0, z - 12)
                 node.physicsBody = SCNPhysicsBody.dynamic()
                 node.physicsBody?.mass = 100
                 node.physicsBody?.categoryBitMask = CollisionCategory.block.rawValue
                 node.physicsBody?.collisionBitMask = CollisionCategory.floor.rawValue | CollisionCategory.ball.rawValue
+                node.physicsBody?.contactTestBitMask = CollisionCategory.ball.rawValue
+
+                scnView.scene?.rootNode.addChildNode(node)
+            }
+        }
+
+        for x in 0..<8 {
+            for z in 0..<4 {
+                let material = SCNMaterial()
+                material.diffuse.contents = UIColor(hue: .random(in: 0...255), saturation: 1, brightness: 1, alpha: 1)
+
+                let box = SCNBox(width: 1, height: 0.5, length: 0.5, chamferRadius: 0)
+                box.materials = [material]
+
+                let node = SCNNode(geometry: box)
+                node.position = SCNVector3(x * 2 - 7 + (z % 2), 1, z + 7)
+                node.physicsBody = SCNPhysicsBody.dynamic()
+                node.physicsBody?.mass = 100
+                node.physicsBody?.categoryBitMask = CollisionCategory.block.rawValue
+                node.physicsBody?.collisionBitMask = CollisionCategory.floor.rawValue | CollisionCategory.ball.rawValue
+                node.physicsBody?.contactTestBitMask = CollisionCategory.ball.rawValue
 
                 scnView.scene?.rootNode.addChildNode(node)
             }
@@ -151,12 +177,13 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         geometry.materials = [material]
 
         let node = SCNNode(geometry: geometry)
-        node.position = SCNVector3((point.x - view.frame.midX) / view.frame.width * 10, 0.1, 10)
+        node.position = SCNVector3((point.x - view.frame.midX) / view.frame.width * 16, 0.1, (point.y - view.frame.midY) / view.frame.height * 10)
         node.physicsBody = SCNPhysicsBody.dynamic()
         node.physicsBody?.restitution = 1.0
         node.physicsBody?.rollingFriction = 0.1
         node.physicsBody?.categoryBitMask = CollisionCategory.ball.rawValue
         node.physicsBody?.collisionBitMask = CollisionCategory.floor.rawValue | CollisionCategory.block.rawValue
+        node.physicsBody?.contactTestBitMask = CollisionCategory.block.rawValue
 
         scnView.scene?.rootNode.addChildNode(node)
 
@@ -201,11 +228,7 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
     }
     
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        if UIDevice.current.userInterfaceIdiom == .phone {
-            return .allButUpsideDown
-        } else {
-            return .all
-        }
+        return .all
     }
 
     //==========================================================================
@@ -213,20 +236,25 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
     //==========================================================================
 
     func physicsWorld(_ world: SCNPhysicsWorld, didBegin contact: SCNPhysicsContact) {
-        // TODO: Show Explosion Particle or something
-    }
-
-    func physicsWorld(_ world: SCNPhysicsWorld, didEnd contact: SCNPhysicsContact) {
         func handle(node: SCNNode) {
-            print(node)
-
-            guard let category = CollisionCategory(rawValue: node.categoryBitMask) else {
+            guard
+                let physicsBody = node.physicsBody,
+                let category = CollisionCategory(rawValue: physicsBody.categoryBitMask)
+            else {
                 return
             }
 
             // TODO: Remove Block or Reduce Health
+            // TODO: Show something like an explosion
             if category == .block {
+                score += 1
                 node.removeFromParentNode()
+
+                if score == 32 {
+                    score = 0
+                    print("You Win!")
+                    layoutDemoBlocks()
+                }
             }
         }
 
