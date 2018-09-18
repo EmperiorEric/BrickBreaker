@@ -9,6 +9,7 @@
 import UIKit
 import QuartzCore
 import SceneKit
+import GLKit
 
 enum CollisionCategory: Int {
     case ball = 2
@@ -55,6 +56,8 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
 
     var displayLink: CADisplayLink?
 
+    let cameraNode = SCNNode()
+
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -62,7 +65,6 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         let scene = SCNScene()
         
         // create and add a camera to the scene
-        let cameraNode = SCNNode()
         cameraNode.camera = SCNCamera()
         scene.rootNode.addChildNode(cameraNode)
         
@@ -165,7 +167,8 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         if gestureRecognizer.state == .ended {
             let position = gestureRecognizer.location(in: scnView)
 
-            addBall(at: position)
+//            addBall(at: position)
+            addBox(atPoint: position)
         }
     }
 
@@ -176,8 +179,17 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         let geometry = SCNSphere(radius: 0.25)
         geometry.materials = [material]
 
+        var worldPoint = convertPoint2Dto3D(point)
+        worldPoint.y = 0.1
+
         let node = SCNNode(geometry: geometry)
-        node.position = SCNVector3((point.x - view.frame.midX) / view.frame.width * 16, 0.1, (point.y - view.frame.midY) / view.frame.height * 10)
+//        node.position = SCNVector3((point.x - view.frame.midX) / view.frame.width * 16, 0.1, (point.y - view.frame.midY) / view.frame.height * 10)
+
+        print(SCNVector3((point.x - view.frame.midX) / view.frame.width * 16, 0.1, (point.y - view.frame.midY) / view.frame.height * 10))
+        print(worldPoint)
+
+        node.position = worldPoint
+
         node.physicsBody = SCNPhysicsBody.dynamic()
         node.physicsBody?.restitution = 1.0
         node.physicsBody?.rollingFriction = 0.1
@@ -195,6 +207,7 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
 
         let node = SCNNode(geometry: geometry)
         node.position = convertPoint2Dto3D(point)
+        node.position.y = 1
         scnView.scene?.rootNode.addChildNode(node)
 
         node.runAction(SCNAction.repeatForever(SCNAction.rotateBy(x: 0, y: 2, z: 0, duration: 1)))
@@ -210,11 +223,17 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         // The zeropoint for the z isn't actually even, so grab our origin.
         let projectedOrigin = scnView.projectPoint(SCNVector3Zero)
 
+        print(projectedOrigin)
+
         // Convert to 3D with our x/y plus the origin z
-        let touchPoint = SCNVector3(x: Float(point.x), y: Float(point.y), z: projectedOrigin.z)
+        let touchPoint = SCNVector3(x: Float(point.x), y: projectedOrigin.y, z: Float(point.y))
+
+        print(touchPoint)
 
         // unproject it to 3D space
         let convertedPoint = scnView.unprojectPoint(touchPoint)
+
+        print(convertedPoint)
 
         return convertedPoint
     }
