@@ -66,6 +66,7 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         
         // create and add a camera to the scene
         cameraNode.camera = SCNCamera()
+        cameraNode.camera?.zFar = 25
         scene.rootNode.addChildNode(cameraNode)
         
         // place the camera
@@ -93,7 +94,7 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         scnView.scene = scene
         
         // allows the user to manipulate the camera
-        scnView.allowsCameraControl = true
+//        scnView.allowsCameraControl = true
 
         // show statistics such as fps and timing information
         scnView.showsStatistics = true
@@ -108,15 +109,29 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap(gestureRecognizer:)))
         scnView.addGestureRecognizer(tapGesture)
 
-        layoutDemoBlocks()
+        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(gesture:)))
+        scnView.addGestureRecognizer(panGesture)
 
         displayLink = CADisplayLink(target: self, selector: #selector(gameloop))
-        displayLink?.add(to: RunLoop.current, forMode: .tracking)
+        displayLink?.add(to: RunLoop.current, forMode: .default)
+
+        setupGame()
     }
 
     @objc func gameloop() {
-        print("Duh")
-        addBall(at: view.center)
+
+    }
+
+    var boxNode: SCNNode!
+    func setupGame() {
+        layoutDemoBlocks()
+
+//        let geometry = SCNBox(width: 2.0, height: 2.0, length: 2.0, chamferRadius: 0.0)
+//
+//        let node = SCNNode(geometry: geometry)
+//        scnView.scene?.rootNode.addChildNode(node)
+//
+//        boxNode = node
     }
 
     var score: Int = 0
@@ -142,33 +157,68 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
             }
         }
 
-        for x in 0..<8 {
-            for z in 0..<4 {
-                let material = SCNMaterial()
-                material.diffuse.contents = UIColor(hue: .random(in: 0...255), saturation: 1, brightness: 1, alpha: 1)
+//        for x in 0..<8 {
+//            for z in 0..<4 {
+//                let material = SCNMaterial()
+//                material.diffuse.contents = UIColor(hue: .random(in: 0...255), saturation: 1, brightness: 1, alpha: 1)
+//
+//                let box = SCNBox(width: 1, height: 0.5, length: 0.5, chamferRadius: 0)
+//                box.materials = [material]
+//
+//                let node = SCNNode(geometry: box)
+//                node.position = SCNVector3(x * 2 - 7 + (z % 2), 1, z + 7)
+//                node.physicsBody = SCNPhysicsBody.dynamic()
+//                node.physicsBody?.mass = 100
+//                node.physicsBody?.categoryBitMask = CollisionCategory.block.rawValue
+//                node.physicsBody?.collisionBitMask = CollisionCategory.floor.rawValue | CollisionCategory.ball.rawValue
+//                node.physicsBody?.contactTestBitMask = CollisionCategory.ball.rawValue
+//
+//                scnView.scene?.rootNode.addChildNode(node)
+//            }
+//        }
+    }
 
-                let box = SCNBox(width: 1, height: 0.5, length: 0.5, chamferRadius: 0)
-                box.materials = [material]
+    func moveBoxToPoint(position: CGPoint) {
+        let projectedOrigin = scnView.projectPoint(SCNVector3Zero)
+        let unprojectedOrigin = scnView.unprojectPoint(SCNVector3Zero)
+        print("projectedOrigin: \(projectedOrigin)")
+        print("unprojectedOrigin: \(unprojectedOrigin)")
 
-                let node = SCNNode(geometry: box)
-                node.position = SCNVector3(x * 2 - 7 + (z % 2), 1, z + 7)
-                node.physicsBody = SCNPhysicsBody.dynamic()
-                node.physicsBody?.mass = 100
-                node.physicsBody?.categoryBitMask = CollisionCategory.block.rawValue
-                node.physicsBody?.collisionBitMask = CollisionCategory.floor.rawValue | CollisionCategory.ball.rawValue
-                node.physicsBody?.contactTestBitMask = CollisionCategory.ball.rawValue
+//        let box3DPosition = boxNode.position
+//        let box2DPosition = scnView.projectPoint(box3DPosition)
 
-                scnView.scene?.rootNode.addChildNode(node)
-            }
-        }
+        // 0.3 is 0 - 1 for the clipping plane. 0 being on the near and 1 being
+        // on the far. Really we need to figure out where 0 y is on the clipping
+        // plane...
+
+        var newBox3DPosition = scnView.unprojectPoint(SCNVector3(position.x, position.y, 1))
+//        newBox3DPosition.y = 0
+
+        //            print("box3DPosition: \(box3DPosition)")
+        //            print("box2DPosition: \(box2DPosition)")
+
+        print("newBox3DPosition: \(newBox3DPosition)")
+
+        boxNode.position = newBox3DPosition
     }
     
     @objc func handleTap(gestureRecognizer: UITapGestureRecognizer) {
         if gestureRecognizer.state == .ended {
             let position = gestureRecognizer.location(in: scnView)
 
-//            addBall(at: position)
-            addBox(atPoint: position)
+            addBall(at: position)
+//            addBox(atPoint: position)
+
+//            moveBoxToPoint(position: position)
+        }
+    }
+
+    @objc func handlePan(gesture: UIPanGestureRecognizer) {
+        if gesture.state == .changed {
+            let position = gesture.location(in: scnView)
+
+            addBall(at: position)
+//            moveBoxToPoint(position: position)
         }
     }
 
@@ -185,10 +235,12 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         let node = SCNNode(geometry: geometry)
 //        node.position = SCNVector3((point.x - view.frame.midX) / view.frame.width * 16, 0.1, (point.y - view.frame.midY) / view.frame.height * 10)
 
-        print(SCNVector3((point.x - view.frame.midX) / view.frame.width * 16, 0.1, (point.y - view.frame.midY) / view.frame.height * 10))
-        print(worldPoint)
+//        print(SCNVector3((point.x - view.frame.midX) / view.frame.width * 16, 0.1, (point.y - view.frame.midY) / view.frame.height * 10))
+//        print(worldPoint)
 
-        node.position = worldPoint
+//        node.position = worldPoint
+
+        node.position = scnView.unprojectPoint(SCNVector3(point.x, point.y, 1))
 
         node.physicsBody = SCNPhysicsBody.dynamic()
         node.physicsBody?.restitution = 1.0
@@ -231,7 +283,8 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         print(touchPoint)
 
         // unproject it to 3D space
-        let convertedPoint = scnView.unprojectPoint(touchPoint)
+        var convertedPoint = scnView.unprojectPoint(touchPoint)
+        convertedPoint.y = projectedOrigin.y
 
         print(convertedPoint)
 
@@ -270,14 +323,18 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
                 node.removeFromParentNode()
 
                 if score == 32 {
-                    score = 0
-                    print("You Win!")
-                    layoutDemoBlocks()
+                    gameOver()
                 }
             }
         }
 
         handle(node: contact.nodeA)
         handle(node: contact.nodeB)
+    }
+
+    func gameOver() {
+        score = 0
+        print("You Win!")
+        layoutDemoBlocks()
     }
 }
