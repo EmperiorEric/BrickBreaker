@@ -11,23 +11,6 @@ import QuartzCore
 import SceneKit
 import GLKit
 
-enum CollisionCategory: Int {
-    case ball = 2
-    case block = 4
-    case floor = 8
-}
-
-extension SCNPhysicsBody {
-    var collisionCategory: [CollisionCategory] {
-        get {
-            return []
-        }
-        set {
-//            collisionBitMask = collisionCategory.map({$0.rawValue})
-        }
-    }
-}
-
 class GameViewController: UIViewController, SCNPhysicsContactDelegate {
 
     override func loadView() {
@@ -40,18 +23,18 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
 
     lazy var floor: SCNNode = {
         let material = SCNMaterial()
-        material.diffuse.contents = UIColor(hue: .random(in: 0...255), saturation: 0.5, brightness: 0.5, alpha: 1)
+        material.diffuse.contents = UIColor.green
 
         let plane = SCNPlane(width: 20, height: 40)
         plane.materials = [material]
 
-        let floor = SCNNode(geometry: plane)
-        floor.eulerAngles.x = .pi / -2.0
-        floor.physicsBody = SCNPhysicsBody.kinematic()
-        floor.physicsBody?.categoryBitMask = CollisionCategory.floor.rawValue
-        floor.physicsBody?.collisionBitMask = CollisionCategory.ball.rawValue | CollisionCategory.block.rawValue
+        let node = SCNNode(geometry: plane)
+        node.eulerAngles.x = .pi / -2.0
+        node.physicsBody = SCNPhysicsBody.kinematic()
+        node.physicsBody?.categoryMask = .world
+        node.physicsBody?.collisionMask = [.structure, .target, .projectile]
 
-        return floor
+        return node
     }()
 
     var displayLink: CADisplayLink?
@@ -125,20 +108,33 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
     var boxNode: SCNNode!
     func setupGame() {
         layoutDemoBlocks()
-
-//        let geometry = SCNBox(width: 2.0, height: 2.0, length: 2.0, chamferRadius: 0.0)
-//
-//        let node = SCNNode(geometry: geometry)
-//        scnView.scene?.rootNode.addChildNode(node)
-//
-//        boxNode = node
     }
 
-    var score: Int = 0
+    var score: Int = 0 {
+        didSet {
+            print("Score: \(score)")
+            if score >= 3 {
+                scnView.scene?.rootNode.childNodes.forEach {
+                    guard $0 != floor else {
+                        return
+                    }
+                    $0.removeFromParentNode()
+                }
+                gameOver()
+            }
+        }
+    }
 
     func layoutDemoBlocks() {
-        for x in 0..<8 {
-            for z in 0..<4 {
+        // Create the Castle we need to destroy
+        let castle = CastleNode()
+        castle.position = SCNVector3(0, 0, -12)
+        scnView.scene?.rootNode.addChildNode(castle)
+
+        // Layout barrier blocks
+        for z in 1...4 {
+            let rowCount = 7 - (z % 2)
+            for x in 1..<rowCount {
                 let material = SCNMaterial()
                 material.diffuse.contents = UIColor(hue: .random(in: 0...255), saturation: 1, brightness: 1, alpha: 1)
 
@@ -149,33 +145,13 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
                 node.position = SCNVector3(x * 2 - 7 + (z % 2), 0, z - 12)
                 node.physicsBody = SCNPhysicsBody.dynamic()
                 node.physicsBody?.mass = 100
-                node.physicsBody?.categoryBitMask = CollisionCategory.block.rawValue
-                node.physicsBody?.collisionBitMask = CollisionCategory.floor.rawValue | CollisionCategory.ball.rawValue
-                node.physicsBody?.contactTestBitMask = CollisionCategory.ball.rawValue
+                node.physicsBody?.categoryMask = .structure
+                node.physicsBody?.collisionMask = [.world, .projectile]
+                node.physicsBody?.contactTestMask = .projectile
 
                 scnView.scene?.rootNode.addChildNode(node)
             }
         }
-
-//        for x in 0..<8 {
-//            for z in 0..<4 {
-//                let material = SCNMaterial()
-//                material.diffuse.contents = UIColor(hue: .random(in: 0...255), saturation: 1, brightness: 1, alpha: 1)
-//
-//                let box = SCNBox(width: 1, height: 0.5, length: 0.5, chamferRadius: 0)
-//                box.materials = [material]
-//
-//                let node = SCNNode(geometry: box)
-//                node.position = SCNVector3(x * 2 - 7 + (z % 2), 1, z + 7)
-//                node.physicsBody = SCNPhysicsBody.dynamic()
-//                node.physicsBody?.mass = 100
-//                node.physicsBody?.categoryBitMask = CollisionCategory.block.rawValue
-//                node.physicsBody?.collisionBitMask = CollisionCategory.floor.rawValue | CollisionCategory.ball.rawValue
-//                node.physicsBody?.contactTestBitMask = CollisionCategory.ball.rawValue
-//
-//                scnView.scene?.rootNode.addChildNode(node)
-//            }
-//        }
     }
 
     func moveBoxToPoint(position: CGPoint) {
@@ -207,9 +183,6 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
             let position = gestureRecognizer.location(in: scnView)
 
             addBall(at: position)
-//            addBox(atPoint: position)
-
-//            moveBoxToPoint(position: position)
         }
     }
 
@@ -223,31 +196,8 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
     }
 
     func addBall(at point: CGPoint) {
-        let material = SCNMaterial()
-        material.diffuse.contents = UIColor(hue: .random(in: 0...255), saturation: 1, brightness: 1, alpha: 1)
-
-        let geometry = SCNSphere(radius: 0.25)
-        geometry.materials = [material]
-
-        var worldPoint = convertPoint2Dto3D(point)
-        worldPoint.y = 0.1
-
-        let node = SCNNode(geometry: geometry)
-//        node.position = SCNVector3((point.x - view.frame.midX) / view.frame.width * 16, 0.1, (point.y - view.frame.midY) / view.frame.height * 10)
-
-//        print(SCNVector3((point.x - view.frame.midX) / view.frame.width * 16, 0.1, (point.y - view.frame.midY) / view.frame.height * 10))
-//        print(worldPoint)
-
-//        node.position = worldPoint
-
+        let node = BallNode()
         node.position = scnView.unprojectPoint(SCNVector3(point.x, point.y, 1))
-
-        node.physicsBody = SCNPhysicsBody.dynamic()
-        node.physicsBody?.restitution = 1.0
-        node.physicsBody?.rollingFriction = 0.1
-        node.physicsBody?.categoryBitMask = CollisionCategory.ball.rawValue
-        node.physicsBody?.collisionBitMask = CollisionCategory.floor.rawValue | CollisionCategory.block.rawValue
-        node.physicsBody?.contactTestBitMask = CollisionCategory.block.rawValue
 
         scnView.scene?.rootNode.addChildNode(node)
 
@@ -309,22 +259,25 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
 
     func physicsWorld(_ world: SCNPhysicsWorld, didBegin contact: SCNPhysicsContact) {
         func handle(node: SCNNode) {
-            guard
-                let physicsBody = node.physicsBody,
-                let category = CollisionCategory(rawValue: physicsBody.categoryBitMask)
-            else {
+            guard let categoryMask = node.physicsBody?.categoryMask else {
                 return
             }
 
-            // TODO: Remove Block or Reduce Health
-            // TODO: Show something like an explosion
-            if category == .block {
-                score += 1
-                node.removeFromParentNode()
-
-                if score == 32 {
-                    gameOver()
+            if categoryMask.isDestructible {
+                // TODO: Show something like an explosion
+                if var destructible = node as? Destructible {
+                    destructible.health -= 1
+                    if destructible.health <= 0 {
+                        node.removeFromParentNode()
+                    }
                 }
+                else {
+                    node.removeFromParentNode()
+                }
+            }
+
+            if categoryMask.isScorable {
+                score += 1
             }
         }
 
