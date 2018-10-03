@@ -30,7 +30,23 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
 
         let node = SCNNode(geometry: plane)
         node.eulerAngles.x = .pi / -2.0
-        node.physicsBody = SCNPhysicsBody.kinematic()
+        node.physicsBody = SCNPhysicsBody.static()
+        node.physicsBody?.categoryMask = .world
+        node.physicsBody?.collisionMask = [.structure, .target, .projectile]
+
+        return node
+    }()
+
+    lazy var wall: SCNNode = {
+        let material = SCNMaterial()
+        material.diffuse.contents = UIColor.green
+
+        let plane = SCNPlane(width: 20, height: 40)
+        plane.materials = [material]
+
+        let node = SCNNode(geometry: plane)
+        node.eulerAngles.x = .pi / -16
+        node.physicsBody = SCNPhysicsBody.static()
         node.physicsBody?.categoryMask = .world
         node.physicsBody?.collisionMask = [.structure, .target, .projectile]
 
@@ -81,13 +97,15 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
 
         // show statistics such as fps and timing information
         scnView.showsStatistics = true
+        scnView.debugOptions = [.showPhysicsShapes]
         
         // configure the view
         scnView.backgroundColor = UIColor.black
 
         scene.rootNode.addChildNode(floor)
+        scene.rootNode.addChildNode(wall)
         scene.physicsWorld.contactDelegate = self
-        
+
         // add a tap gesture recognizer
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap(gestureRecognizer:)))
         scnView.addGestureRecognizer(tapGesture)
@@ -101,8 +119,16 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         setupGame()
     }
 
-    @objc func gameloop() {
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
 
+        wall.position = scnView.unprojectPoint(SCNVector3(view.bounds.midX, 200, 0.9999))
+    }
+
+    @objc func gameloop() {
+        if let location = panLocation {
+            addBall(at: location)
+        }
     }
 
     var boxNode: SCNNode!
@@ -113,7 +139,7 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
     var score: Int = 0 {
         didSet {
             print("Score: \(score)")
-            if score >= 3 {
+            if score >= 300 {
                 scnView.scene?.rootNode.childNodes.forEach {
                     guard $0 != floor else {
                         return
@@ -186,18 +212,24 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         }
     }
 
+    var panLocation: CGPoint?
     @objc func handlePan(gesture: UIPanGestureRecognizer) {
-        if gesture.state == .changed {
-            let position = gesture.location(in: scnView)
+        panLocation = gesture.location(in: scnView)
 
-            addBall(at: position)
-//            moveBoxToPoint(position: position)
+        if gesture.state == .ended {
+            panLocation = nil
         }
+//        if gesture.state == .changed {
+//            let position = gesture.location(in: scnView)
+//
+//            addBall(at: position)
+////            moveBoxToPoint(position: position)
+//        }
     }
 
     func addBall(at point: CGPoint) {
         let node = BallNode()
-        node.position = scnView.unprojectPoint(SCNVector3(point.x, point.y, 1))
+        node.position = scnView.unprojectPoint(SCNVector3(point.x, point.y, 0.9999))
 
         scnView.scene?.rootNode.addChildNode(node)
 
