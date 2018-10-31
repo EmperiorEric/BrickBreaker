@@ -37,21 +37,21 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         return node
     }()
 
-    lazy var wall: SCNNode = {
+    func createWall() -> SCNNode {
         let material = SCNMaterial()
-        material.diffuse.contents = UIColor.green
+        material.diffuse.contents = UIColor.blue
 
-        let plane = SCNPlane(width: 20, height: 40)
+        let plane = SCNPlane(width: 100, height: 100)
         plane.materials = [material]
 
         let node = SCNNode(geometry: plane)
-        node.eulerAngles.x = .pi / -16
         node.physicsBody = SCNPhysicsBody.static()
         node.physicsBody?.categoryMask = .world
         node.physicsBody?.collisionMask = [.structure, .target, .projectile]
+        node.physicsBody?.restitution = 1.5
 
         return node
-    }()
+    }
 
     var displayLink: CADisplayLink?
 
@@ -103,7 +103,6 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         scnView.backgroundColor = UIColor.black
 
         scene.rootNode.addChildNode(floor)
-        scene.rootNode.addChildNode(wall)
         scene.physicsWorld.contactDelegate = self
 
         // add a tap gesture recognizer
@@ -122,13 +121,11 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
 
-        wall.position = scnView.unprojectPoint(SCNVector3(view.bounds.midX, 200, 0.9999))
+        setupWalls()
     }
 
     @objc func gameloop() {
-        if let location = panLocation {
-            addBall(at: location)
-        }
+        panLocations.forEach { addBall(at: $0) }
     }
 
     var boxNode: SCNNode!
@@ -139,15 +136,19 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
     var score: Int = 0 {
         didSet {
             print("Score: \(score)")
-            if score >= 300 {
-                scnView.scene?.rootNode.childNodes.forEach {
-                    guard $0 != floor else {
-                        return
-                    }
-                    $0.removeFromParentNode()
-                }
+            if score >= 3 {
+                reset()
                 gameOver()
             }
+        }
+    }
+
+    func reset() {
+        scnView.scene?.rootNode.childNodes.forEach {
+            guard $0 != floor else {
+                return
+            }
+            $0.removeFromParentNode()
         }
     }
 
@@ -180,28 +181,24 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         }
     }
 
-    func moveBoxToPoint(position: CGPoint) {
-        let projectedOrigin = scnView.projectPoint(SCNVector3Zero)
-        let unprojectedOrigin = scnView.unprojectPoint(SCNVector3Zero)
-        print("projectedOrigin: \(projectedOrigin)")
-        print("unprojectedOrigin: \(unprojectedOrigin)")
+    func setupWalls() {
+        let topWall = createWall()
+        scnView.scene?.rootNode.addChildNode(topWall)
+        topWall.position = scnView.unprojectPoint(SCNVector3(view.bounds.midX, view.bounds.minY, 0.9999))
 
-//        let box3DPosition = boxNode.position
-//        let box2DPosition = scnView.projectPoint(box3DPosition)
+        let leftWall = createWall()
+        scnView.scene?.rootNode.addChildNode(leftWall)
+        leftWall.position = scnView.unprojectPoint(SCNVector3(view.bounds.minX, view.bounds.midY, 0.9999))
+        leftWall.runAction(SCNAction.rotateBy(x: 0, y: .pi / 2, z: 0, duration: 0.1))
 
-        // 0.3 is 0 - 1 for the clipping plane. 0 being on the near and 1 being
-        // on the far. Really we need to figure out where 0 y is on the clipping
-        // plane...
+        let rightWall = createWall()
+        scnView.scene?.rootNode.addChildNode(rightWall)
+        rightWall.position = scnView.unprojectPoint(SCNVector3(view.bounds.maxX, view.bounds.midY, 0.9999))
+        rightWall.runAction(SCNAction.rotateBy(x: 0, y: .pi / -2, z: 0, duration: 0.1))
 
-        var newBox3DPosition = scnView.unprojectPoint(SCNVector3(position.x, position.y, 1))
-//        newBox3DPosition.y = 0
-
-        //            print("box3DPosition: \(box3DPosition)")
-        //            print("box2DPosition: \(box2DPosition)")
-
-        print("newBox3DPosition: \(newBox3DPosition)")
-
-        boxNode.position = newBox3DPosition
+        let bottomWall = createWall()
+        scnView.scene?.rootNode.addChildNode(bottomWall)
+        bottomWall.position = scnView.unprojectPoint(SCNVector3(view.bounds.midX, view.bounds.maxY, 0.9999))
     }
     
     @objc func handleTap(gestureRecognizer: UITapGestureRecognizer) {
@@ -212,19 +209,15 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         }
     }
 
-    var panLocation: CGPoint?
+    var panLocations: [CGPoint] = []
     @objc func handlePan(gesture: UIPanGestureRecognizer) {
-        panLocation = gesture.location(in: scnView)
+        panLocations = (0..<gesture.numberOfTouches).map({ touch -> CGPoint in
+            return gesture.location(ofTouch: touch, in: scnView)
+        })
 
-        if gesture.state == .ended {
-            panLocation = nil
+        if gesture.state == .ended || gesture.state == .cancelled {
+            panLocations = []
         }
-//        if gesture.state == .changed {
-//            let position = gesture.location(in: scnView)
-//
-//            addBall(at: position)
-////            moveBoxToPoint(position: position)
-//        }
     }
 
     func addBall(at point: CGPoint) {
@@ -234,43 +227,6 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         scnView.scene?.rootNode.addChildNode(node)
 
         node.physicsBody?.applyForce(SCNVector3(0, 0, -30), asImpulse: true)
-    }
-
-    func addBox(atPoint point: CGPoint) {
-        let geometry = SCNBox(width: 2.0, height: 2.0, length: 2.0, chamferRadius: 0.0)
-
-        let node = SCNNode(geometry: geometry)
-        node.position = convertPoint2Dto3D(point)
-        node.position.y = 1
-        scnView.scene?.rootNode.addChildNode(node)
-
-        node.runAction(SCNAction.repeatForever(SCNAction.rotateBy(x: 0, y: 2, z: 0, duration: 1)))
-    }
-
-    func convertPoint3Dto2D(_ point: SCNVector3) -> CGPoint {
-        let projectedPoint = scnView.projectPoint(point)
-
-        return CGPoint(x: Double(projectedPoint.x), y: Double(projectedPoint.y))
-    }
-
-    func convertPoint2Dto3D(_ point: CGPoint) -> SCNVector3 {
-        // The zeropoint for the z isn't actually even, so grab our origin.
-        let projectedOrigin = scnView.projectPoint(SCNVector3Zero)
-
-        print(projectedOrigin)
-
-        // Convert to 3D with our x/y plus the origin z
-        let touchPoint = SCNVector3(x: Float(point.x), y: projectedOrigin.y, z: Float(point.y))
-
-        print(touchPoint)
-
-        // unproject it to 3D space
-        var convertedPoint = scnView.unprojectPoint(touchPoint)
-        convertedPoint.y = projectedOrigin.y
-
-        print(convertedPoint)
-
-        return convertedPoint
     }
     
     override var shouldAutorotate: Bool {
@@ -302,9 +258,6 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
                     if destructible.health <= 0 {
                         node.removeFromParentNode()
                     }
-                }
-                else {
-                    node.removeFromParentNode()
                 }
             }
 

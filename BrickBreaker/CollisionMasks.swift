@@ -28,7 +28,7 @@ struct Mask: OptionSet {
         return Mask.indestructible.contains(self)
     }
 
-    static let destructible: Mask = [.target]
+    static let destructible: Mask = [.target, .projectile, .structure]
     var isDestructible: Bool {
         return Mask.destructible.contains(self)
     }
