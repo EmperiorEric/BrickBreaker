@@ -48,7 +48,7 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
         node.physicsBody = SCNPhysicsBody.static()
         node.physicsBody?.categoryMask = .world
         node.physicsBody?.collisionMask = [.structure, .target, .projectile]
-        node.physicsBody?.restitution = 1.5
+        node.physicsBody?.restitution = 1
 
         return node
     }
@@ -175,6 +175,7 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
                 node.physicsBody?.categoryMask = .structure
                 node.physicsBody?.collisionMask = [.world, .projectile]
                 node.physicsBody?.contactTestMask = .projectile
+                node.physicsBody?.restitution = 1.0
 
                 scnView.scene?.rootNode.addChildNode(node)
             }
@@ -210,23 +211,43 @@ class GameViewController: UIViewController, SCNPhysicsContactDelegate {
     }
 
     var panLocations: [CGPoint] = []
+    var pannedBall: BallNode?
     @objc func handlePan(gesture: UIPanGestureRecognizer) {
-        panLocations = (0..<gesture.numberOfTouches).map({ touch -> CGPoint in
-            return gesture.location(ofTouch: touch, in: scnView)
-        })
+//        panLocations = (0..<gesture.numberOfTouches).map({ touch -> CGPoint in
+//            return gesture.location(ofTouch: touch, in: scnView)
+//        })
+//
+//        if gesture.state == .ended || gesture.state == .cancelled {
+//            panLocations = []
+//        }
 
-        if gesture.state == .ended || gesture.state == .cancelled {
-            panLocations = []
+        if gesture.state == .began {
+            let location = gesture.location(in: scnView)
+            pannedBall = addBall(at: location)
+        }
+
+        if gesture.state == .changed {
+            let location = gesture.location(in: scnView)
+            pannedBall?.position = scnView.unprojectPoint(SCNVector3(location.x, location.y, 0.9999))
+        }
+
+        if gesture.state == .ended {
+            let velocity = gesture.velocity(in: scnView)
+
+            pannedBall?.physicsBody?.applyForce(SCNVector3(velocity.x / 70, 0, velocity.y / 70), asImpulse: true)
+            pannedBall = nil
         }
     }
 
-    func addBall(at point: CGPoint) {
+    @discardableResult func addBall(at point: CGPoint) -> BallNode {
         let node = BallNode()
         node.position = scnView.unprojectPoint(SCNVector3(point.x, point.y, 0.9999))
 
         scnView.scene?.rootNode.addChildNode(node)
 
-        node.physicsBody?.applyForce(SCNVector3(0, 0, -30), asImpulse: true)
+//        node.physicsBody?.applyForce(SCNVector3(0, 0, -30), asImpulse: true)
+
+        return node
     }
     
     override var shouldAutorotate: Bool {

@@ -24,6 +24,7 @@ class BallNode: SCNNode {
         physicsBody = SCNPhysicsBody.dynamic()
         physicsBody?.restitution = 1.0
         physicsBody?.rollingFriction = 0.1
+//        physicsBody?.friction = 0.0
         physicsBody?.categoryMask = .projectile
         physicsBody?.collisionMask = [.world, .destructible, .structure, .projectile]
         physicsBody?.contactTestMask = .destructible
